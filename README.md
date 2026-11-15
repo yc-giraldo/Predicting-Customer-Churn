@@ -25,5 +25,6 @@ Adicionalmente, se busca identificar los 100 clientes con mayor riesgo de abando
 El repositorio incluirá la base de datos del caso, el código desarrollado en R, las tablas y gráficas generadas y el informe final con los resultados del análisis.
 
 ## Integrantes
-
-Trabajo desarrollado por un equipo de tres estudiantes de Administración de Empresas de la Pontificia Universidad Javeriana.
+Isabella Alvarado
+Carolina Moreno
+Yiselh Camila Giraldo
