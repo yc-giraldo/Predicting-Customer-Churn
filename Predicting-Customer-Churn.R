@@ -394,7 +394,6 @@ tabla_actividad[, -1] <- round(tabla_actividad[, -1], 2)
 # Mostrar resultados
 print(tabla_actividad)
 
-
 # GRAFICA: CAMBIO EN LOS INICIOS DE SESION
 
 grafica_logins <- ggplot(
@@ -465,3 +464,36 @@ tabla_atipicos <- data.frame(
 )
 
 print(tabla_atipicos)
+
+# GUARDAR TABLA DE VALORES ATIPICOS COMO PNG
+
+library(gridExtra)
+library(grid)
+
+# Preparar la tabla
+tabla_atipicos_png <- tabla_atipicos
+
+# Agregar porcentaje
+tabla_atipicos_png$Porcentaje <- round(
+  tabla_atipicos_png$Atipicos / nrow(datos) * 100, 2
+)
+
+# Quitar nombres repetidos de las filas
+rownames(tabla_atipicos_png) <- NULL
+
+# Guardar como imagen
+png("Tabla_Atipicos.png", width = 1800, height = 900, res = 150)
+
+grid.newpage()
+
+grid.draw(
+  tableGrob(
+    tabla_atipicos_png,
+    rows = NULL
+  )
+)
+
+dev.off()
+
+# Comprobar que se guardo
+file.exists("Tabla_Atipicos.png")
