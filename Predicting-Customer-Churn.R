@@ -1175,3 +1175,24 @@ nobs(modelo_logistico)
 # Con este modelo, el siguiente paso sera evaluar
 # las predicciones e identificar los 100 clientes
 # con mayor riesgo de abandonar la empresa.
+
+# PUNTO 4. EVALUACION PREDICTIVA DEL MODELO LOGISTICO
+
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+
+if (!exists("modelo_logistico")) {
+  modelo_logistico <- readRDS("Modelo_Logistico_Churn.rds")
+}
+if (!exists("datos_modelo")) {
+  datos_modelo <- readRDS("Datos_Modelo_Churn.rds")
+}
+
+# Calcular probabilidades predichas de abandono para cada cliente
+datos_modelo$Prob_Churn <- predict(
+  modelo_logistico,
+  newdata = datos_modelo,
+  type = "response"
+)
