@@ -497,3 +497,473 @@ dev.off()
 
 # Comprobar que se guardo
 file.exists("Tabla_Atipicos.png")
+
+# PUNTO 2. FACTORES ASOCIADOS AL ABANDONO
+
+# 2.1. Preparacion de los datos
+
+library(readxl)
+library(ggplot2)
+library(dplyr)
+
+# Cargar la base de datos
+datos <- read_excel("DATA.xlsx", sheet = "Case Data")
+
+# Crear grupos segun el abandono
+datos$Estado <- ifelse(
+  datos$`Churn (1 = Yes, 0 = No)` == 1,
+  "Abandonaron",
+  "Permanecieron"
+)
+
+# Revisar cantidad de clientes por grupo
+table(datos$Estado)
+
+# Comprobar que la base se cargo correctamente
+dim(datos)
+
+# 2.2. RELACION ENTRE ANTIGUEDAD Y ABANDONO
+
+# Crear grupos de antiguedad
+datos <- datos %>%
+  mutate(
+    Grupo_Antiguedad = case_when(
+      `Customer Age (in months)` < 6 ~ "Menos de 6 meses",
+      `Customer Age (in months)` <= 14 ~ "6 a 14 meses",
+      `Customer Age (in months)` > 14 ~ "Mas de 14 meses",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Calcular abandono por grupo
+tabla_antiguedad_churn <- datos %>%
+  filter(!is.na(Grupo_Antiguedad),
+         !is.na(`Churn (1 = Yes, 0 = No)`)) %>%
+  group_by(Grupo_Antiguedad) %>%
+  summarise(
+    Total_Clientes = n(),
+    Abandonaron = sum(`Churn (1 = Yes, 0 = No)` == 1),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Porcentaje_Abandono = round(
+      Abandonaron / Total_Clientes * 100, 2
+    )
+  )
+
+# Mostrar resultados
+print(tabla_antiguedad_churn)
+
+# 2.3. GRAFICA DE ABANDONO POR ANTIGUEDAD
+
+# Organizar los grupos
+tabla_antiguedad_churn$Grupo_Antiguedad <- factor(
+  tabla_antiguedad_churn$Grupo_Antiguedad,
+  levels = c(
+    "Menos de 6 meses",
+    "6 a 14 meses",
+    "Mas de 14 meses"
+  )
+)
+
+# Crear grafica
+grafica_riesgo_antiguedad <- ggplot(
+  tabla_antiguedad_churn,
+  aes(x = Grupo_Antiguedad,
+      y = Porcentaje_Abandono,
+      fill = Grupo_Antiguedad)
+) +
+  geom_col(width = 0.65) +
+  geom_text(
+    aes(label = paste0(Porcentaje_Abandono, "%")),
+    vjust = -0.5,
+    size = 4
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Menos de 6 meses" = "#237A91",
+      "6 a 14 meses" = "#E58A62",
+      "Mas de 14 meses" = "#75A9B6"
+    )
+  ) +
+  labs(
+    title = "Porcentaje de abandono segun antiguedad",
+    x = "Antiguedad del cliente",
+    y = "Porcentaje de abandono (%)"
+  ) +
+  expand_limits(y = 9) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Guardar grafica en PNG
+ggsave(
+  "Grafica_Riesgo_Antiguedad.png",
+  plot = grafica_riesgo_antiguedad,
+  width = 8,
+  height = 5,
+  dpi = 300,
+  bg = "white"
+)
+
+# Mostrar grafica
+print(grafica_riesgo_antiguedad)
+
+# Comprobar que se guardo
+file.exists("Grafica_Riesgo_Antiguedad.png")
+
+# 2.4. RELACION ENTRE SATISFACCION (CHI) Y ABANDONO
+
+tabla_chi_abandono <- datos %>%
+  group_by(Estado) %>%
+  summarise(
+    Promedio_CHI_Mes0 = round(mean(`CHI Score Month 0`, na.rm = TRUE), 2),
+    Mediana_CHI_Mes0 = round(median(`CHI Score Month 0`, na.rm = TRUE), 2),
+    Promedio_Cambio_CHI = round(mean(`CHI Score 0-1`, na.rm = TRUE), 2),
+    Mediana_Cambio_CHI = round(median(`CHI Score 0-1`, na.rm = TRUE), 2),
+    Clientes = n(),
+    .groups = "drop"
+  )
+
+print(tabla_chi_abandono)
+
+# 2.5. GUARDAR TABLA DE SATISFACCION COMO PNG
+
+library(gridExtra)
+library(grid)
+
+# Preparar tabla para imagen
+tabla_chi_png <- as.data.frame(tabla_chi_abandono)
+
+# Cambiar nombres para que se vean mejor
+names(tabla_chi_png) <- c(
+  "Estado",
+  "CHI promedio",
+  "Mediana CHI",
+  "Cambio promedio",
+  "Mediana cambio",
+  "Clientes"
+)
+
+# Crear tabla visual
+tabla_visual_chi <- tableGrob(
+  tabla_chi_png,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 12,
+    colhead = list(
+      fg_params = list(fontface = "bold")
+    )
+  )
+)
+
+# Guardar tabla como PNG
+png(
+  "Tabla_CHI_Abandono.png",
+  width = 1800,
+  height = 500,
+  res = 150
+)
+
+grid.newpage()
+grid.draw(tabla_visual_chi)
+dev.off()
+
+# Verificar archivo
+file.exists("Tabla_CHI_Abandono.png")
+
+# 2.6. GRAFICA COMPARATIVA DEL CHI - CORREGIDA
+
+library(ggplot2)
+
+# Crear grafica
+grafica_chi_promedio <- ggplot(
+  tabla_chi_abandono,
+  aes(x = Estado, y = Promedio_CHI_Mes0, fill = Estado)
+) +
+  geom_col(width = 0.6) +
+  geom_text(
+    aes(label = round(Promedio_CHI_Mes0, 2)),
+    vjust = -0.5,
+    size = 5
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Abandonaron" = "#E58A62",
+      "Permanecieron" = "#237A91"
+    )
+  ) +
+  labs(
+    title = "Satisfaccion promedio de los clientes",
+    x = "Estado del cliente",
+    y = "CHI promedio"
+  ) +
+  coord_cartesian(ylim = c(0, 105)) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    plot.margin = margin(25, 25, 25, 25)
+  )
+
+# Guardar con dispositivo de Windows
+png(
+  filename = "Grafica_CHI_Promedio.png",
+  width = 2400,
+  height = 1500,
+  res = 300,
+  type = "windows"
+)
+
+print(grafica_chi_promedio)
+dev.off()
+
+# Verificar
+file.exists("Grafica_CHI_Promedio.png")
+
+# 2.7. RELACION ENTRE SOPORTE TECNICO Y ABANDONO
+
+# Comparar soporte tecnico segun el estado del cliente
+tabla_soporte_churn <- datos %>%
+  group_by(Estado) %>%
+  summarise(
+    Casos_Promedio = round(
+      mean(`Support Cases Month 0`, na.rm = TRUE), 2
+    ),
+    Cambio_Casos = round(
+      mean(`Support Cases 0-1`, na.rm = TRUE), 2
+    ),
+    Prioridad_Promedio = round(
+      mean(`SP Month 0`, na.rm = TRUE), 2
+    ),
+    Cambio_Prioridad = round(
+      mean(`SP 0-1`, na.rm = TRUE), 2
+    ),
+    Clientes = n(),
+    .groups = "drop"
+  )
+
+# Mostrar resultados
+print(tabla_soporte_churn)
+
+# 2.8. GUARDAR TABLA DE SOPORTE COMO PNG
+
+library(gridExtra)
+library(grid)
+
+# Preparar la tabla
+tabla_soporte_png <- as.data.frame(tabla_soporte_churn)
+
+# Cambiar nombres de columnas
+names(tabla_soporte_png) <- c(
+  "Estado",
+  "Casos promedio",
+  "Cambio casos",
+  "Prioridad promedio",
+  "Cambio prioridad",
+  "Clientes"
+)
+
+# Crear tabla visual
+tabla_visual_soporte <- tableGrob(
+  tabla_soporte_png,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 12,
+    colhead = list(
+      fg_params = list(fontface = "bold")
+    )
+  )
+)
+
+# Guardar tabla como imagen
+png(
+  "Tabla_Soporte_Churn.png",
+  width = 2000,
+  height = 550,
+  res = 150,
+  type = "windows"
+)
+
+grid.newpage()
+grid.draw(tabla_visual_soporte)
+dev.off()
+
+# Verificar archivo
+file.exists("Tabla_Soporte_Churn.png")
+
+# 2.9. GRAFICA COMPARATIVA DE SOPORTE TECNICO
+
+# Crear grafica
+grafica_soporte_promedio <- ggplot(
+  tabla_soporte_churn,
+  aes(x = Estado, y = Casos_Promedio, fill = Estado)
+) +
+  geom_col(width = 0.6) +
+  geom_text(
+    aes(label = Casos_Promedio),
+    vjust = -0.5,
+    size = 5
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Abandonaron" = "#E58A62",
+      "Permanecieron" = "#237A91"
+    )
+  ) +
+  labs(
+    title = "Solicitudes de soporte tecnico por cliente",
+    subtitle = "Comparacion segun el abandono",
+    x = "Estado del cliente",
+    y = "Promedio de solicitudes de soporte"
+  ) +
+  coord_cartesian(ylim = c(0, 0.9)) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      face = "bold",
+      size = 16
+    ),
+    plot.subtitle = element_text(size = 11),
+    plot.margin = margin(25, 25, 25, 25)
+  )
+
+# Guardar grafica como PNG
+png(
+  filename = "Grafica_Soporte_Promedio.png",
+  width = 2400,
+  height = 1500,
+  res = 300,
+  type = "windows"
+)
+
+print(grafica_soporte_promedio)
+dev.off()
+
+# Verificar que se guardo
+file.exists("Grafica_Soporte_Promedio.png")
+
+# 2.10. RELACION ENTRE ACTIVIDAD Y ABANDONO
+
+# Comparar actividad de los clientes
+tabla_actividad_churn <- datos %>%
+  group_by(Estado) %>%
+  summarise(
+    Cambio_Logins = round(
+      mean(`Logins 0-1`, na.rm = TRUE), 2
+    ),
+    Cambio_Blogs = round(
+      mean(`Blog Articles 0-1`, na.rm = TRUE), 2
+    ),
+    Cambio_Views = round(
+      mean(`Views 0-1`, na.rm = TRUE), 2
+    ),
+    Cambio_Dias_Login = round(
+      mean(`Days Since Last Login 0-1`, na.rm = TRUE), 2
+    ),
+    Clientes = n(),
+    .groups = "drop"
+  )
+
+# Mostrar resultados
+print(tabla_actividad_churn)
+
+# GUARDAR TABLA DE ACTIVIDAD COMO PNG
+
+library(gridExtra)
+library(grid)
+
+# Preparar tabla
+tabla_actividad_png <- as.data.frame(tabla_actividad_churn)
+
+# Cambiar nombres de columnas
+names(tabla_actividad_png) <- c(
+  "Estado",
+  "Cambio logins",
+  "Cambio blogs",
+  "Cambio views",
+  "Cambio dias login",
+  "Clientes"
+)
+
+# Crear tabla visual
+tabla_visual_actividad <- tableGrob(
+  tabla_actividad_png,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 12,
+    colhead = list(
+      fg_params = list(fontface = "bold")
+    )
+  )
+)
+
+# Guardar como PNG
+png(
+  "Tabla_Actividad_Churn.png",
+  width = 2000,
+  height = 550,
+  res = 150,
+  type = "windows"
+)
+
+grid.newpage()
+grid.draw(tabla_visual_actividad)
+dev.off()
+
+# Verificar archivo
+file.exists("Tabla_Actividad_Churn.png")
+
+# 2.11. GRAFICA COMPARATIVA DE ACTIVIDAD
+
+library(ggplot2)
+
+# Crear grafica de inicios de sesion
+grafica_actividad_churn <- ggplot(
+  tabla_actividad_churn,
+  aes(x = Estado, y = Cambio_Logins, fill = Estado)
+) +
+  geom_col(width = 0.6) +
+  geom_text(
+    aes(label = Cambio_Logins),
+    vjust = -0.5,
+    size = 5
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Abandonaron" = "#E58A62",
+      "Permanecieron" = "#237A91"
+    )
+  ) +
+  labs(
+    title = "Cambio promedio en los inicios de sesion",
+    subtitle = "Comparacion segun el abandono de clientes",
+    x = "Estado del cliente",
+    y = "Cambio promedio de logins"
+  ) +
+  coord_cartesian(ylim = c(0, 19)) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      face = "bold",
+      size = 16
+    ),
+    plot.subtitle = element_text(size = 11),
+    plot.margin = margin(25, 25, 25, 25)
+  )
+
+# Guardar grafica en PNG
+png(
+  filename = "Grafica_Actividad_Churn.png",
+  width = 2400,
+  height = 1500,
+  res = 300,
+  type = "windows"
+)
+
+print(grafica_actividad_churn)
+dev.off()
+
+# Verificar archivo
+file.exists("Grafica_Actividad_Churn.png")
