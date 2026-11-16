@@ -1134,3 +1134,44 @@ file.exists("Datos_Modelo_Churn.rds")
 
 # Verificar numero de observaciones del modelo
 nobs(modelo_logistico)
+
+# CONCLUSIONES DE LOS PUNTOS 2 Y 3
+
+# Al analizar los datos encontramos que los clientes
+# que llevaban entre 6 y 14 meses en la empresa
+# fueron los que mas abandonaron, con un 7.22%.
+# En cambio, los de menos de 6 meses tuvieron
+# el porcentaje mas bajo, con un 1.56%.
+
+# Tambien vimos que la satisfaccion tiene una relacion
+# importante con el abandono. Los clientes que se fueron
+# tenian un CHI promedio de 63.27, mientras que los
+# que se quedaron tenian 88.61. Ademas, la satisfaccion
+# de los que abandonaron habia disminuido.
+
+# En el soporte tecnico encontramos algo diferente
+# a lo que esperaba el gerente. Los clientes que se
+# quedaron hicieron mas solicitudes de soporte que
+# los que abandonaron. Sin embargo, en la regresion
+# estas variables no fueron significativas.
+
+# Con la actividad de los clientes vimos que los que
+# permanecieron aumentaron mas sus inicios de sesion.
+# Tambien encontramos que las visualizaciones y los
+# dias desde el ultimo ingreso fueron significativos
+# en el modelo, pero los logins y blogs no.
+
+# Finalmente, la regresion logistica mostro que
+# la antiguedad, el CHI, el cambio del CHI, las
+# visualizaciones y los dias desde el ultimo login
+# tienen una relacion significativa con el abandono.
+
+# En general, encontramos que la satisfaccion y
+# la actividad de los clientes pueden ayudar a
+# identificar quienes tienen mas riesgo de irse.
+# Sin embargo, estos resultados no significan que
+# esas variables sean directamente la causa.
+
+# Con este modelo, el siguiente paso sera evaluar
+# las predicciones e identificar los 100 clientes
+# con mayor riesgo de abandonar la empresa.
