@@ -967,3 +967,170 @@ dev.off()
 
 # Verificar archivo
 file.exists("Grafica_Actividad_Churn.png")
+
+# PUNTO 3. MODELO DE REGRESION LOGISTICA
+
+# 3.1. PREPARACION DE VARIABLES
+
+library(dplyr)
+
+# Seleccionar variables para el modelo
+datos_modelo <- datos %>%
+  select(
+    ID,
+    `Churn (1 = Yes, 0 = No)`,
+    `Customer Age (in months)`,
+    `CHI Score Month 0`,
+    `CHI Score 0-1`,
+    `Support Cases Month 0`,
+    `Support Cases 0-1`,
+    `SP Month 0`,
+    `SP 0-1`,
+    `Logins 0-1`,
+    `Blog Articles 0-1`,
+    `Views 0-1`,
+    `Days Since Last Login 0-1`
+  ) %>%
+  rename(
+    Churn = `Churn (1 = Yes, 0 = No)`,
+    Antiguedad = `Customer Age (in months)`,
+    CHI = `CHI Score Month 0`,
+    Cambio_CHI = `CHI Score 0-1`,
+    Casos_Soporte = `Support Cases Month 0`,
+    Cambio_Soporte = `Support Cases 0-1`,
+    Prioridad = `SP Month 0`,
+    Cambio_Prioridad = `SP 0-1`,
+    Logins = `Logins 0-1`,
+    Blogs = `Blog Articles 0-1`,
+    Views = `Views 0-1`,
+    Dias_Login = `Days Since Last Login 0-1`
+  )
+
+# Verificar dimensiones
+dim(datos_modelo)
+
+# Revisar estructura de variables
+str(datos_modelo)
+
+# Revisar valores faltantes
+colSums(is.na(datos_modelo))
+
+# Comprobar la variable dependiente
+table(datos_modelo$Churn, useNA = "ifany")
+
+# 3.2. MODELO DE REGRESION LOGISTICA
+
+# Construir modelo con las variables del caso
+modelo_logistico <- glm(
+  Churn ~ Antiguedad + CHI + Cambio_CHI +
+    Casos_Soporte + Cambio_Soporte +
+    Prioridad + Cambio_Prioridad +
+    Logins + Blogs + Views + Dias_Login,
+  data = datos_modelo,
+  family = binomial(link = "logit")
+)
+
+# Mostrar resultados del modelo
+summary(modelo_logistico)
+
+# Verificar cantidad de observaciones utilizadas
+nobs(modelo_logistico)
+
+# 3.3. ODDS RATIOS DEL MODELO LOGISTICO
+
+# Extraer coeficientes del modelo
+resultados_modelo <- summary(modelo_logistico)$coefficients
+
+# Crear tabla de resultados
+tabla_odds <- data.frame(
+  Variable = rownames(resultados_modelo),
+  Coeficiente = round(resultados_modelo[, 1], 5),
+  Odds_Ratio = round(exp(resultados_modelo[, 1]), 5),
+  Valor_p = signif(resultados_modelo[, 4], 3),
+  row.names = NULL
+)
+
+# Identificar variables significativas
+tabla_odds$Significativa <- ifelse(
+  tabla_odds$Valor_p < 0.05,
+  "Si",
+  "No"
+)
+
+# Mostrar resultados
+print(tabla_odds)
+
+# 3.4. GUARDAR TABLA DE ODDS RATIOS COMO PNG
+
+library(gridExtra)
+library(grid)
+
+# Preparar tabla para imagen
+tabla_odds_png <- tabla_odds
+
+# Cambiar nombres para que se vean mejor
+names(tabla_odds_png) <- c(
+  "Variable",
+  "Coeficiente",
+  "Odds ratio",
+  "Valor p",
+  "Significativa"
+)
+
+
+# Mostrar valores p con maximo 3 decimales
+tabla_odds_png$`Valor p` <- ifelse(
+  tabla_odds$Valor_p < 0.001,
+  "<0.001",
+  sprintf("%.3f", tabla_odds$Valor_p)
+)
+)
+
+# Crear tabla visual
+tabla_visual_odds <- tableGrob(
+  tabla_odds_png,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 11,
+    colhead = list(
+      fg_params = list(fontface = "bold")
+    )
+  )
+)
+
+# Guardar tabla como PNG
+png(
+  "Tabla_Odds_Ratios.png",
+  width = 2200,
+  height = 700,
+  res = 150,
+  type = "windows"
+)
+
+grid.newpage()
+grid.draw(tabla_visual_odds)
+dev.off()
+
+# Verificar archivo
+file.exists("Tabla_Odds_Ratios.png")
+
+# GUARDAR MODELO DE REGRESION LOGISTICA
+
+# Guardar modelo para su uso posterior
+saveRDS(
+  modelo_logistico,
+  file = "Modelo_Logistico_Churn.rds"
+)
+
+# Guardar datos utilizados en el modelo
+saveRDS(
+  datos_modelo,
+  file = "Datos_Modelo_Churn.rds"
+)
+
+# Verificar que los archivos se guardaron
+file.exists("Modelo_Logistico_Churn.rds")
+file.exists("Datos_Modelo_Churn.rds")
+
+# Verificar numero de observaciones del modelo
+nobs(modelo_logistico)
