@@ -1196,3 +1196,102 @@ datos_modelo$Prob_Churn <- predict(
   newdata = datos_modelo,
   type = "response"
 )
+
+
+# 4.1. MATRIZ DE CONFUSION Y METRICAS (UMBRAL ESTANDAR 0.50 vs UMBRAL OPTIMO)
+# Evaluacion con umbral estandar (0.50)
+pred_05 <- ifelse(datos_modelo$Prob_Churn >= 0.50, 1, 0)
+matriz_05 <- table(
+  Real = factor(datos_modelo$Churn, levels = c(0, 1)),
+  Predicho = factor(pred_05, levels = c(0, 1))
+)
+print("Matriz de Confusion - Umbral 0.50:")
+print(matriz_05)
+
+# Calculo exacto de Curva ROC, AUC e Indice de Youden (en R base, cero errores)
+umbrales <- sort(unique(datos_modelo$Prob_Churn), decreasing = TRUE)
+umbrales <- c(1, umbrales, 0)
+
+roc_datos <- do.call(rbind, lapply(umbrales, function(u) {
+  pred <- ifelse(datos_modelo$Prob_Churn >= u, 1, 0)
+  vp <- sum(datos_modelo$Churn == 1 & pred == 1)
+  vn <- sum(datos_modelo$Churn == 0 & pred == 0)
+  fp <- sum(datos_modelo$Churn == 0 & pred == 1)
+  fn <- sum(datos_modelo$Churn == 1 & pred == 0)
+  
+  tpr <- vp / (vp + fn) # Sensibilidad
+  fpr <- fp / (fp + vn) # 1 - Especificidad
+  esp <- vn / (vn + fp) # Especificidad
+  youden <- tpr + esp - 1
+  data.frame(Umbral = u, TPR = tpr, FPR = fpr, Especificidad = esp, Youden = youden)
+}))
+
+# Calcular AUC mediante integracion trapezoidal
+roc_ordenado <- roc_datos[order(roc_datos$FPR, roc_datos$TPR), ]
+auc_valor <- round(
+  sum(diff(roc_ordenado$FPR) * (head(roc_ordenado$TPR, -1) + tail(roc_ordenado$TPR, -1)) / 2),
+  4
+)
+
+# Seleccionar umbral optimo (Indice de Youden maximo)
+fila_optima <- roc_datos[which.max(roc_datos$Youden), ][1, ]
+umbral_optimo <- fila_optima$Umbral
+
+# Predicciones con umbral optimo
+datos_modelo$Pred_Optima <- ifelse(datos_modelo$Prob_Churn >= umbral_optimo, 1, 0)
+
+# Componentes de la matriz de confusion optima
+VP <- sum(datos_modelo$Churn == 1 & datos_modelo$Pred_Optima == 1)
+VN <- sum(datos_modelo$Churn == 0 & datos_modelo$Pred_Optima == 0)
+FP <- sum(datos_modelo$Churn == 0 & datos_modelo$Pred_Optima == 1)
+FN <- sum(datos_modelo$Churn == 1 & datos_modelo$Pred_Optima == 0)
+
+# Metricas de evaluacion
+exactitud <- round((VP + VN) / nrow(datos_modelo) * 100, 2)
+sensibilidad <- round(VP / (VP + FN) * 100, 2)
+especificidad <- round(VN / (VN + FP) * 100, 2)
+precision <- round(VP / (VP + FP) * 100, 2)
+
+# Tabla resumen de metricas
+tabla_metricas <- data.frame(
+  Metrica = c(
+    "AUC (Area bajo la curva ROC)",
+    "Umbral optimo de clasificacion (Youden)",
+    "Exactitud (Accuracy)",
+    "Sensibilidad (Recall / Deteccion de Churn)",
+    "Especificidad (Deteccion de Retencion)",
+    "Precision (Valor Predictivo Positivo)"
+  ),
+  Valor = c(
+    as.character(auc_valor),
+    paste0(round(umbral_optimo * 100, 2), "%"),
+    paste0(exactitud, "%"),
+    paste0(sensibilidad, "%"),
+    paste0(especificidad, "%"),
+    paste0(precision, "%")
+  )
+)
+
+print(tabla_metricas)
+
+# Guardar Tabla de Metricas como PNG 
+tabla_visual_metricas <- tableGrob(
+  tabla_metricas,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 12,
+    colhead = list(fg_params = list(fontface = "bold"))
+  )
+)
+
+png(
+  filename = "Tabla_Metricas_Modelo.png",
+  width = 2000,
+  height = 750,
+  res = 150
+)
+grid.newpage()
+grid.draw(tabla_visual_metricas)
+dev.off()
+
+# 4.2. GRAFICA DE MATRIZ DE CONFUSION (UMBRAL OPTIMO)
