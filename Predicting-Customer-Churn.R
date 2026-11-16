@@ -1295,3 +1295,119 @@ grid.draw(tabla_visual_metricas)
 dev.off()
 
 # 4.2. GRAFICA DE MATRIZ DE CONFUSION (UMBRAL OPTIMO)
+df_matriz <- data.frame(
+  Real = factor(
+    c("Permanecio (0)", "Permanecio (0)", "Abandono (1)", "Abandono (1)"),
+    levels = c("Abandono (1)", "Permanecio (0)")
+  ),
+  Predicho = factor(
+    c("Permanecio (0)", "Abandono (1)", "Permanecio (0)", "Abandono (1)"),
+    levels = c("Permanecio (0)", "Abandono (1)")
+  ),
+  Cantidad = c(VN, FP, FN, VP),
+  Etiqueta = c(
+    paste0("VN: ", VN, "\n(", round(VN / nrow(datos_modelo) * 100, 1), "%)"),
+    paste0("FP: ", FP, "\n(", round(FP / nrow(datos_modelo) * 100, 1), "%)"),
+    paste0("FN: ", FN, "\n(", round(FN / nrow(datos_modelo) * 100, 1), "%)"),
+    paste0("VP: ", VP, "\n(", round(VP / nrow(datos_modelo) * 100, 1), "%)")
+  )
+)
+
+grafica_matriz <- ggplot(df_matriz, aes(x = Predicho, y = Real, fill = Cantidad)) +
+  geom_tile(color = "white", linewidth = 1.5) +
+  geom_text(aes(label = Etiqueta), size = 5, fontface = "bold", color = "black") +
+  scale_fill_gradient(low = "#EBF3F5", high = "#237A91") +
+  labs(
+    title = "Matriz de confusion del modelo logistico",
+    subtitle = paste0("Evaluada con umbral optimo de Youden (", round(umbral_optimo * 100, 2), "%)"),
+    x = "Prediccion del modelo",
+    y = "Estado real del cliente"
+  ) +
+  theme_classic(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 11),
+    plot.margin = margin(25, 25, 25, 25)
+  )
+ggsave(
+  filename = "Grafica_Matriz_Confusion.png",
+  plot = grafica_matriz,
+  width = 8,
+  height = 5,
+  dpi = 300,
+  bg = "white"
+)
+
+# 4.3. GRAFICA DE CURVA ROC
+
+grafica_roc <- ggplot(roc_ordenado, aes(x = FPR, y = TPR)) +
+  geom_line(color = "#237A91", linewidth = 1.3) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#E58A62", linewidth = 1) +
+  annotate(
+    "text",
+    x = 0.65,
+    y = 0.25,
+    label = paste0("AUC = ", auc_valor),
+    size = 5.5,
+    fontface = "bold",
+    color = "#237A91"
+  ) +
+  labs(
+    title = "Curva ROC del modelo de prediccion de abandono",
+    subtitle = "Capacidad discriminante del modelo logistico",
+    x = "Tasa de Falsos Positivos (1 - Especificidad)",
+    y = "Tasa de Verdaderos Positivos (Sensibilidad)"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 11),
+    plot.margin = margin(25, 25, 25, 25)
+  )
+
+ggsave(
+  filename = "Grafica_Curva_ROC.png",
+  plot = grafica_roc,
+  width = 8,
+  height = 5,
+  dpi = 300,
+  bg = "white"
+)
+
+# PUNTO 5. RANKING DE LOS 100 CLIENTES DE MAYOR RIESGO Y FACTORES PRINCIPALES
+
+# 5.1. IDENTIFICAR LOS 3 FACTORES QUE MAS CONTRIBUYEN AL RIESGO DE CADA CLIENTE
+coeficientes <- coef(modelo_logistico)[-1]
+variables_x <- names(coeficientes)
+medias_x <- colMeans(datos_modelo[, variables_x], na.rm = TRUE)
+
+# Contribucion marginal al log-odds respecto al cliente promedio: beta_j * (X_ij - media_j)
+contribuciones <- as.data.frame(
+  sapply(variables_x, function(var) {
+    coeficientes[var] * (datos_modelo[[var]] - medias_x[var])
+  })
+)
+
+nombres_legibles <- c(
+  Antiguedad = "Antiguedad",
+  CHI = "Bajo CHI",
+  Cambio_CHI = "Caida en CHI",
+  Casos_Soporte = "Casos soporte",
+  Cambio_Soporte = "Aumento soporte",
+  Prioridad = "Prioridad alta",
+  Cambio_Prioridad = "Cambio prioridad",
+  Logins = "Cambio logins",
+  Blogs = "Cambio blogs",
+  Views = "Caida en views",
+  Dias_Login = "Dias sin login"
+)
+
+top3_factores <- t(apply(contribuciones, 1, function(fila) {
+  ordenados <- sort(fila, decreasing = TRUE)
+  nombres_legibles[names(ordenados)[1:3]]
+}))
+
+datos_modelo$Factor_1 <- top3_factores[, 1]
+datos_modelo$Factor_2 <- top3_factores[, 2]
+datos_modelo$Factor_3 <- top3_factores[, 3]
