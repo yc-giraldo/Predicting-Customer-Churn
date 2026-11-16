@@ -1411,3 +1411,113 @@ top3_factores <- t(apply(contribuciones, 1, function(fila) {
 datos_modelo$Factor_1 <- top3_factores[, 1]
 datos_modelo$Factor_2 <- top3_factores[, 2]
 datos_modelo$Factor_3 <- top3_factores[, 3]
+
+
+# 5.2. RANKING TOP 100 CLIENTES CON MAYOR PROBABILIDAD DE ABANDONO
+ranking_100 <- datos_modelo %>%
+  arrange(desc(Prob_Churn)) %>%
+  slice(1:100) %>%
+  mutate(
+    Ranking = row_number(),
+    Probabilidad_Pct = round(Prob_Churn * 100, 2)
+  ) %>%
+  select(
+    Ranking,
+    ID,
+    Probabilidad_Pct,
+    Factor_1,
+    Factor_2,
+    Factor_3,
+    Antiguedad,
+    CHI,
+    Cambio_CHI,
+    Views,
+    Dias_Login,
+    Churn
+  )
+
+# Exportar lista completa de los 100 clientes a CSV
+write.csv(ranking_100, "Ranking_Top100_Clientes_Riesgo.csv", row.names = FALSE)
+
+# Mostrar los primeros 15 clientes en consola
+print(head(ranking_100, 15))
+
+# 5.3. GUARDAR TABLA DEL TOP 15 CLIENTES EN MAYOR RIESGO COMO PNG
+tabla_top15_png <- ranking_100 %>%
+  slice(1:15) %>%
+  select(Ranking, ID, Probabilidad_Pct, Factor_1, Factor_2, Factor_3, CHI, Cambio_CHI, Dias_Login)
+
+names(tabla_top15_png) <- c(
+  "Rank",
+  "ID Cliente",
+  "Prob. Churn (%)",
+  "Factor 1",
+  "Factor 2",
+  "Factor 3",
+  "CHI",
+  "Cambio CHI",
+  "Dias sin Login"
+)
+
+tabla_visual_top15 <- tableGrob(
+  tabla_top15_png,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 10,
+    colhead = list(fg_params = list(fontface = "bold"))
+  )
+)
+
+png(
+  filename = "Tabla_Top15_Clientes_Riesgo.png",
+  width = 2400,
+  height = 1100,
+  res = 150
+)
+grid.newpage()
+grid.draw(tabla_visual_top15)
+dev.off()
+
+# 5.4. GRAFICA DE PRINCIPALES FACTORES DE RIESGO EN EL TOP 100
+todos_factores_top100 <- c(ranking_100$Factor_1, ranking_100$Factor_2, ranking_100$Factor_3)
+
+df_factores_top100 <- as.data.frame(table(Factor = todos_factores_top100)) %>%
+  arrange(desc(Freq)) %>%
+  slice(1:6)
+
+grafica_factores_top100 <- ggplot(
+  df_factores_top100,
+  aes(x = reorder(Factor, Freq), y = Freq)
+) +
+  geom_col(width = 0.65, fill = "#237A91") +
+  geom_col(data = subset(df_factores_top100, Freq >= 50), width = 0.65, fill = "#E58A62") +
+  geom_text(
+    aes(label = paste0(Freq, " clientes")),
+    hjust = -0.15,
+    size = 4.2,
+    fontface = "bold"
+  ) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 115)) +
+  labs(
+    title = "Principales impulsores de riesgo en el Top 100",
+    subtitle = "Frecuencia de aparicion entre los 3 factores criticos de cada cliente",
+    x = "Factor de riesgo",
+    y = "Numero de clientes en el Top 100"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 11),
+    plot.margin = margin(25, 25, 25, 25)
+  )
+
+ggsave(
+  filename = "Grafica_Factores_Top100.png",
+  plot = grafica_factores_top100,
+  width = 8,
+  height = 5,
+  dpi = 300,
+  bg = "white"
+)
